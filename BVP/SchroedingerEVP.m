@@ -36,13 +36,12 @@ if (nargin < 6)
 
 end
 
-
 % Extract some mesh information
 N = msh.numPoints;    % Number of nodes
 
 % Compute the FE matrices
 [MM, KK] = FEmatrices(msh, funQ, funP);
-MM_Id      = FEmatrices(msh);
+MM_Id    = FEmatrices(msh);
 
 % =================== %
 % Boundary conditions %

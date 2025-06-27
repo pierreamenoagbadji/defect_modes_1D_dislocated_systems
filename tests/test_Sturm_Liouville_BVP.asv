@@ -12,11 +12,11 @@ clear; clc;
 % ********** %
 % Coefficients and source term
 funP = @(x) ones(size(x, 1), 1);
-funQ = @(x) zeros(size(x, 1), 1); % 2 + cos(2*pi*x);
+funQ = @(x) ones(size(x, 1), 1); % 2 + cos(2*pi*x);
 RHS  = @(x) zeros(size(x, 1), 1);
 
 % Boundary conditions
-a0 = 3; a1 = 0.5;
+a0 = 3; a1 = 2;
 b0 = 1; b1 = 0;
 BC.A = diag([a0 a1]);
 BC.D = diag([-1  1]);
@@ -44,7 +44,6 @@ plot(msh.points, real(U), 'color', vert);
 set(gca, 'FontSize', 16);
 
 hold on;
-A = (a0 * b1 - a1) / (a0 + a0*a1 + a1);
-B = (b0 + A) / a0; 
-plot(msh.points, A * msh.points + B, '--r');
+Uref = @(x) ((b1 - b0) / (a0 + 2)) * x + 
+plot(msh.points, )
 
