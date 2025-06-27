@@ -1,26 +1,24 @@
-function [U, dU, AA] = SturmLiouvilleBVP(mesh, funP, funQ, RHS, BC, options)
-% function [U, dU, AA] = STURMLIOUVILLEBVP(mesh, funP, funQ, RHS, BC, options)
+function [eigvals, eigvecs, AA] = SchroedingerEVP(msh, funP, funQ, BC, numEigs, options)
+% function [eigvals, eigvecs, AA] = SchroedingerEVP(msh, funP, funQ, BC, numEigs, options)
 %
 % This function computes a Lagrange P1 Finite Elements approximation
-% of the solution of the regular Sturm Liouville equation
+% of solutions of the eigenvalue equation
 %
-% - (funP(x) * u')' + funQ(x) * u = RHS(x),  a < x < b,
+% - (funP(x) * u')' + funQ(x) * u = E * u,  a < x < b,
 %
 % combined with a boundary condition expressed in generic form
 %
-%   A*U + D*dU = B, with U = [u(a); u(b)] and dU = [u'(a); u'(b)]
+%   A*U + D*dU = 0, with U = [u(a); u(b)] and dU = [u'(a); u'(b)]
 %
-% where A and D are a 2x2 matrices and B a 2-sized vector.
+% where A and D are a 2x2 matrices.
 %
-% INPUT: mesh (meshObject) describes the mesh,
+% INPUT: msh (meshObject) describes the mesh,
 %        funP (function), the 2-order term coefficient,
 %        funQ (function), the 0-order term coefficient,
-%        RHS  (function), the source term,
 %        BC is a structure which describes the boundary condition.
 %           BC contains 3 fields:
 %              + A, a 2x2 matrix corresponding to the trace
 %              + D, a 2x2 matrix corresponding to the normal trace
-%              + b, a 2-sized vector corresponding to the rhs
 %        options is a structure with fields
 %           + verbose, if true, provides additional information
 %                      about the process (set to false by default)
@@ -40,10 +38,11 @@ end
 
 
 % Extract some mesh information
-N = mesh.numPoints;    % Number of nodes
+N = msh.numPoints;    % Number of nodes
 
 % Compute the FE matrices
-[MM, KK] = FEmatrices(mesh, funQ, funP);
+[MM, KK] = FEmatrices(msh, funQ, funP);
+MM_Id      = FEmatrices(msh);
 
 % =================== %
 % Boundary conditions %
@@ -68,29 +67,24 @@ if (rank(BC.D) == 2)
   end
 
   % Compute boundary matrices
-  S11 = sparse(N, N); S11(mesh.boundsIds(1), mesh.boundsIds(1)) = 1;
-  S12 = sparse(N, N); S12(mesh.boundsIds(1), mesh.boundsIds(2)) = 1;
-  S21 = sparse(N, N); S21(mesh.boundsIds(2), mesh.boundsIds(1)) = 1;
-  S22 = sparse(N, N); S22(mesh.boundsIds(2), mesh.boundsIds(2)) = 1;
+  S11 = sparse(N, N); S11(msh.boundsIds(1), msh.boundsIds(1)) = 1;
+  S12 = sparse(N, N); S12(msh.boundsIds(1), msh.boundsIds(2)) = 1;
+  S21 = sparse(N, N); S21(msh.boundsIds(2), msh.boundsIds(1)) = 1;
+  S22 = sparse(N, N); S22(msh.boundsIds(2), msh.boundsIds(2)) = 1;
 
   tildeA = BC.D \ BC.A;
-  tildeB = BC.D \ BC.b;
 
   % The FE matrix with the boundary contribution
   SS = - S11 * tildeA(1, 1) - S12 * tildeA(1, 2) +...
          S21 * tildeA(2, 1) + S22 * tildeA(2, 2);
 
   AA = MM + KK + SS;
+  BB = MM_Id;
 
-  % Right-hand side plus the boundary contribution
-  LS = sparse(N, 1);
-  LS(mesh.boundsIds(1)) = -tildeB(1);
-  LS(mesh.boundsIds(2)) =  tildeB(2);
-
-  LL = MM * RHS(mesh.points) + LS;
-
-  % Solve the linear system
-  U = AA \ LL;
+  % Eigenpairs
+  [eigvecs, eigvals] = eigs(AA, BB, numEigs, 'smallestabs');
+  eigvals = diag(eigvals).';
+  eigvecs = eigvecs ./ sqrt(diag(eigvecs' * MM_Id * eigvecs).' * ones(size(eigvecs, 2), 1)); % Normalize the eigenvectors
 
 end
 
@@ -110,20 +104,17 @@ if (rank(BC.D) == 0)
   % The Dirichlet projection matrix
   PP = sparse( (1:N-2)', (2:N-1)', ones(N-2, 1), N-2, N );
 
-  % The FE matrix
+  % The FE matrices
   AA = MM + KK;
+  BB = MM_Id;
   AA0 = PP * AA * PP';
+  BB0 = PP * BB * PP';
 
-  % The right-hand side
-  Ub = sparse(N, 1);
-  Ub(mesh.boundsIds) = BC.A \ BC.b;
-
-  LL = MM * RHS(mesh.points) - AA * Ub;
-  LL0 = PP * LL;
-
-  % Solve the linear system and deduce the solution
-  U0 = AA0 \ LL0;
-  U = Ub + PP' * U0;
+  % Eigenpairs
+  [eigvecs0, eigvals] = eigs(AA0, BB0, numEigs, 'smallestabs');
+  eigvals = diag(eigvals).';
+  eigvecs0 = eigvecs0 ./ sqrt(diag(eigvecs0' * MM_Id * eigvecs0).' * ones(size(eigvecs0, 2), 1)); % Normalize the eigenvectors
+  eigvecs = PP' * eigvecs0;
 
 end
 
@@ -167,9 +158,8 @@ if (rank(BC.D) == 1)
   d2(K0) = BC.D(Im, K0);
 
   % One can deduce the essential condition
-  % and express it under the form A0 * u = b0
+  % and express it under the form A0 * u = 0
   A0 = BC.A(I0, :) - BC.A(Im, :) * d1(I0) / d1(Im);
-  b0 = BC.b(I0)    - BC.b(Im)    * d1(I0) / d1(Im);
 
   % If we do not want the normal traces to appear
   % in the variational formulation, then the test
@@ -194,40 +184,28 @@ if (rank(BC.D) == 1)
 
     % Projection matrix
     PP = sparse((2:N-1)', (2:N-1)', ones(N-2, 1), N-1, N);
-    PP(1, mesh.boundsIds(Km)) =  d2(Km);
-    PP(1, mesh.boundsIds(K0)) = -d2(K0);
-
-    % Essential condition lift
-    Ub = sparse(N, 1);
-    Ub(mesh.boundsIds(K0)) = b0 / A0(K0);
+    PP(1, msh.boundsIds(Km)) =  d2(Km);
+    PP(1, msh.boundsIds(K0)) = -d2(K0);
 
     % Boundary matrices
-    Sm1 = sparse(N, N); Sm1(mesh.boundsIds(Km), mesh.boundsIds(1)) = 1;
-    Sm2 = sparse(N, N); Sm2(mesh.boundsIds(Km), mesh.boundsIds(2)) = 1;
+    Sm1 = sparse(N, N); Sm1(msh.boundsIds(Km), msh.boundsIds(1)) = 1;
+    Sm2 = sparse(N, N); Sm2(msh.boundsIds(Km), msh.boundsIds(2)) = 1;
 
     SS = -((-1)^K0) * (BC.A(Im, 1) * Sm1 + BC.A(Im, 2) * Sm2) /...
                                             (d1(Im) * d2(Km));
-
+    
+    % FE matrices
     AA = MM + KK + SS;
+    BB = MM_Id;
     AA0 = PP * AA * PP';
+    BB0 = PP * BB * PP';
 
-    % Boundary contribution to the right-hand side
-    LS = sparse(N, 1);
-    LS(mesh.boundsIds(Km)) = -((-1)^K0) * BC.b(Im) / (d1(Im) * d2(Km));
-
-    % Compute the right-hand side
-    LL = MM * RHS(mesh.points) + LS - AA * Ub;
-    LL0 = PP * LL;
-
-    % Solve the linear system and deduce the solution
-    U0 = AA0 \ LL0;
-    U = Ub + PP' * U0;
+    % Eigenpairs
+    [eigvecs0, eigvals] = eigs(AA0, BB0, numEigs, 'smallestabs');
+    eigvals = diag(eigvals).';
+    eigvecs0 = eigvecs0 ./ sqrt(diag(eigvecs0' * MM_Id * eigvecs0).' * ones(size(eigvecs0, 2), 1)); % Normalize the eigenvectors
+    eigvecs = PP' * eigvecs0;
 
   end
 
 end
-
-% Compute an approximation of the derivative of the solution
-% using weak evaluation
-[MM0, ~, DD] = FEmatrices(mesh, @(x) ones(size(x)), @(x) ones(size(x)));
-dU = MM0 \ (DD * U);
