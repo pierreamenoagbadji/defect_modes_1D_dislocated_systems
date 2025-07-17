@@ -1,5 +1,5 @@
-function [eigvals, eigvecs, AA] = SchroedingerEVP(msh, funP, funQ, BC, numEigs, options)
-% function [eigvals, eigvecs, AA] = SchroedingerEVP(msh, funP, funQ, BC, numEigs, options)
+function [eigvals, eigvecs, AA, dEigvecs] = SchroedingerCellEVP(msh, funP, funQ, BC, numEigs, options)
+% function [eigvals, eigvecs, AA] = SchroedingerCellEVP(msh, funP, funQ, BC, numEigs, options)
 %
 % This function computes a Lagrange P1 Finite Elements approximation
 % of solutions of the eigenvalue equation
@@ -41,7 +41,7 @@ N = msh.numPoints;    % Number of nodes
 
 % Compute the FE matrices
 [MM, KK] = FEmatrices(msh, funQ, funP);
-MM_Id    = FEmatrices(msh);
+[MM_Id, ~, DD] = FEmatrices(msh);
 
 % =================== %
 % Boundary conditions %
@@ -83,7 +83,6 @@ if (rank(BC.D) == 2)
   % Eigenpairs
   [eigvecs, eigvals] = eigs(AA, BB, numEigs, 'smallestabs');
   eigvals = diag(eigvals).';
-  eigvecs = eigvecs ./ sqrt(diag(eigvecs' * MM_Id * eigvecs).' * ones(size(eigvecs, 2), 1)); % Normalize the eigenvectors
 
 end
 
@@ -112,7 +111,6 @@ if (rank(BC.D) == 0)
   % Eigenpairs
   [eigvecs0, eigvals] = eigs(AA0, BB0, numEigs, 'smallestabs');
   eigvals = diag(eigvals).';
-  eigvecs0 = eigvecs0 ./ sqrt(diag(eigvecs0' * MM_Id * eigvecs0).' * ones(size(eigvecs0, 2), 1)); % Normalize the eigenvectors
   eigvecs = PP' * eigvecs0;
 
 end
@@ -177,7 +175,7 @@ if (rank(BC.D) == 1)
            'test doivent verifier une condition ', ...
            'essentielle differente de celle de ', ...
            'la solution.\nDe telles conditions ne sont ', ...
-           'pas prises en charge.']));  %#ok
+           'pas prises en charge.']));  % #ok
 
   else
 
@@ -202,9 +200,10 @@ if (rank(BC.D) == 1)
     % Eigenpairs
     [eigvecs0, eigvals] = eigs(AA0, BB0, numEigs, 'smallestabs');
     eigvals = diag(eigvals).';
-    eigvecs0 = eigvecs0 ./ sqrt(diag(eigvecs0' * MM_Id * eigvecs0).' * ones(size(eigvecs0, 2), 1)); % Normalize the eigenvectors
     eigvecs = PP' * eigvecs0;
 
   end
 
 end
+
+dEigvecs = MM_Id \ (DD * eigvecs);
