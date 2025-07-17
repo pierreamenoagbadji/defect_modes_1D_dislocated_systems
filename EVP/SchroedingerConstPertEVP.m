@@ -22,13 +22,13 @@ set(groot,'defaultLegendInterpreter','latex');
 % Parameters %
 % ********** %
 % Bounds of the interior domain
-IDb = [-0.5 0.5];
+IDb = [-1.5 1.5];
 ODb = [-10 10];
 
 % Potential inside the interior domain
-Vint = @(x) -1.0*ones(size(x, 1), 1);
-% Vint = @(x) -8.0*cutoff(x, -4-1/4, -4+1/4, 0.1)...
-%             -8.0*cutoff(x, +4-1/4, +4+1/4, 0.1);
+% Vint = @(x) -10.0*ones(size(x, 1), 1);
+Vint = @(x) -8.0*cutoff(x, -1-1/4, -1+1/4, 0.1)...
+            -8.0*cutoff(x, +1-1/4, +1+1/4, 0.1);
 funP = @(x)      ones(size(x, 1), 1);
 
 % Potential on each side of the interior domain
@@ -38,8 +38,8 @@ Vpos = 0;
 Vneg = 0;
 
 % Range for searching the eigenvalue
-% specRange = [-10 -1e-2];
-specRange = [-1 -1e-2];
+specRange = [-10 -1e-2];
+% specRange = [-1 -1e-2];
 numSpec   = 2048;
 specvec   = linspace(specRange(1), specRange(2), numSpec)';
 
@@ -75,8 +75,8 @@ eigvals = zeros(numSpec, numEigs);
 eigvecs = zeros(msh.numPoints, numEigs, numSpec);
 dEigvecs = zeros(msh.numPoints, numEigs, numSpec);
 
-RobinNegVec = 2i * sqrt(abs(specvec));
-RobinPosVec = 2i * sqrt(abs(specvec));
+RobinNegVec = 1i * sqrt(abs(specvec));
+RobinPosVec = 1i * sqrt(abs(specvec));
 
 for idI = 1:numSpec
 

@@ -66,7 +66,7 @@ classdef meshObject < handle
         xmin = varargin{2};
         xmax = varargin{3};
         numPoints = varargin{4};
-        points = sort(linspace(xmin, xmax, numPoints).');
+        points = linspace(xmin, xmax, numPoints).';
 
       elseif strcmpi(varargin{1}, 'custom')
 

@@ -173,7 +173,7 @@ if (abs(abs(BC.D) - 1.0) < eps && abs(BC.b - 1.0) < eps && opts.compute_RtR)
   % Change lambda to the usual expression of the RtR
   % coefficient if requested by the user
   % ONLY FOR BC.D = ±1 AND BC.b = 1.
-  lambda = BC.b - 2*BC.A * U(msh.boundsIds(1));
+  lambda = 2*BC.A * U(msh.boundsIds(1), 1) - BC.b;
 
 end
 
