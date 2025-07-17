@@ -17,7 +17,7 @@
 %% Initialization %
 %  ************** %
 clear; clc;
-% close all;
+close all;
 
 %  ********** %
 %% Parameters %
@@ -46,9 +46,14 @@ pbInputs.int.mu = @(x) ones(size(x, 1), 1);
 pbInputs.int.V  = @(x) Veven(x) + kappa(x) .* Vodd(x);
 
 % Gap range
-pbInputs.specRange = [pi^2 - 3, pi^2 + 3];% [7.4, 7.6];
-pbInputs.numSpec = 512;
-pbInputs.numEigs = 6; % Number of eigenvalues for interior problem
+specRange = [pi^2 - 3, pi^2 + 3];% [7.4, 7.6];
+numSpec = 512;
+% pbInputs.specvec = linspace(specRange(1), specRange(2), numSpec)';
+pbInputs.specvec = [linspace(  (pi^2)-3,   (pi^2)+3, numSpec)'; NaN;...
+                    linspace(3*(pi^2)+2.5, 3*(pi^2)+3.5, 2048)'];
+
+% Number of eigenvalues for interior problem
+pbInputs.numEigs = 4; 
 
 % Mesh nodes
 pbInputs.numNodes = 256;
@@ -95,9 +100,8 @@ function EVPlocPert(pbInputs)
   Vint  = pbInputs.int.V;
 
   % Range for searching the eigenvalue
-  specRange = pbInputs.specRange;
-  numSpec   = pbInputs.numSpec;
-  specvec   = linspace(specRange(1), specRange(2), numSpec)';
+  specvec = pbInputs.specvec;
+  numSpec = length(specvec);
 
   % Number of eigenvalues to compute
   numEigs = pbInputs.numEigs;
@@ -171,35 +175,44 @@ function EVPlocPert(pbInputs)
     RobinNeg = RobinNegVec(idI);
     RobinPos = RobinPosVec(idI);
     
-    % Step 1
-    % ****** %
-    % Compute RtR coefficients obtained by solving the
-    % auxiliary half-line problems
-    %
-    % - (μ_± (x) * u'_±)' + (V_± (x) - E) u_± = 0 on Ω_±,
-    %                      - (u_±)' + r_± u_± = 1 at x = a_±
-    % Plus side
-    BCpos.A = -RobinPos;
-    [~, RtRpos] = PeriodicBVP(mshPos, muPosTrans, @(x) VposTrans(x, specVar), F,...
-      BCpos, numCellsPos, struct('compute_RtR', true));
+    if isnan(specVar)
 
-    % Minus side
-    BCneg.A = -RobinNeg;
-    [~, RtRneg] = PeriodicBVP(mshNeg, muNegTrans, @(x) VnegTrans(x, specVar), F,...
-      BCneg, numCellsNeg, struct('compute_RtR', true));
+      eigvals(idI, :)    = NaN(1, numEigs);
+      eigvecs(:, :, idI) = NaN(mshInt.numPoints, numEigs);
 
-    % Step 2
-    % ****** %
-    % Construct boundary condition for eigenvalue
-    % problem in interior domain
-    BCint.A = diag([RobinNeg * (RtRneg - 1) / (RtRneg + 1);...
-                    RobinPos * (RtRpos - 1) / (RtRpos + 1)]);
+    else
 
-    % Solve eigenvalue problem
-    [eigvals(idI, :), eigvecs(:, :, idI)] = SchroedingerCellEVP(mshInt, muInt, Vint, BCint, numEigs);
+      % Step 1
+      % ****** %
+      % Compute RtR coefficients obtained by solving the
+      % auxiliary half-line problems
+      %
+      % - (μ_± (x) * u'_±)' + (V_± (x) - E) u_± = 0 on Ω_±,
+      %                      - (u_±)' + r_± u_± = 1 at x = a_±
+      % Plus side
+      BCpos.A = -RobinPos;
+      [~, RtRpos] = PeriodicBVP(mshPos, muPosTrans, @(x) VposTrans(x, specVar), F,...
+        BCpos, numCellsPos, struct('compute_RtR', true));
 
-    % Sort eigenvalues by real part
-    eigvals(idI, :) = sort(eigvals(idI, :), 'ComparisonMethod','real');
+      % Minus side
+      BCneg.A = -RobinNeg;
+      [~, RtRneg] = PeriodicBVP(mshNeg, muNegTrans, @(x) VnegTrans(x, specVar), F,...
+        BCneg, numCellsNeg, struct('compute_RtR', true));
+
+      % Step 2
+      % ****** %
+      % Construct boundary condition for eigenvalue
+      % problem in interior domain
+      BCint.A = diag([RobinNeg * (RtRneg - 1) / (RtRneg + 1);...
+                      RobinPos * (RtRpos - 1) / (RtRpos + 1)]);
+
+      % Solve eigenvalue problem
+      [eigvals(idI, :), eigvecs(:, :, idI)] = SchroedingerCellEVP(mshInt, muInt, Vint, BCint, numEigs);
+
+      % Sort eigenvalues by real part
+      eigvals(idI, :) = sort(eigvals(idI, :), 'ComparisonMethod','real');
+
+    end
 
     % Print progress
     fprintf('%3d%%\n', round(100*idI/numSpec));
