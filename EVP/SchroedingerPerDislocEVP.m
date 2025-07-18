@@ -167,7 +167,6 @@ function EVPlocPert(pbInputs)
 
   muPosTrans = @(x) muPos(x + IDb(2)); VposTrans  = @(x, E) Vpos(x + IDb(2)) - E;
   muNegTrans = @(x) muNeg(x + IDb(1)); VnegTrans  = @(x, E) Vneg(x + IDb(1)) - E;
-  F = @(x) zeros(size(x, 1), 1);
 
   for idI = 1:numSpec
 
@@ -191,13 +190,13 @@ function EVPlocPert(pbInputs)
       %                      - (u_±)' + r_± u_± = 1 at x = a_±
       % Plus side
       BCpos.A = -RobinPos;
-      [~, RtRpos] = PeriodicBVP(mshPos, muPosTrans, @(x) VposTrans(x, specVar), F,...
-        BCpos, numCellsPos, struct('compute_RtR', true));
-
+      [~, RtRpos] = PeriodicBVP(mshPos, muPosTrans, @(x) VposTrans(x, specVar),...
+        [], 0, BCpos, numCellsPos, struct('compute_RtR', true));
+      
       % Minus side
       BCneg.A = -RobinNeg;
-      [~, RtRneg] = PeriodicBVP(mshNeg, muNegTrans, @(x) VnegTrans(x, specVar), F,...
-        BCneg, numCellsNeg, struct('compute_RtR', true));
+      [~, RtRneg] = PeriodicBVP(mshNeg, muNegTrans, @(x) VnegTrans(x, specVar),...
+        [], 0, BCneg, numCellsNeg, struct('compute_RtR', true));
 
       % Step 2
       % ****** %
@@ -219,7 +218,6 @@ function EVPlocPert(pbInputs)
 
   end
 
-  
   %% Uncomment for validation for constant interior potential
   %
   % % ************************************************** %
@@ -282,13 +280,13 @@ function EVPlocPert(pbInputs)
         %                      - (u_±)' + r_± u_± = 1 at x = a_±
         % Plus side
         BCpos.A = -RobinPos;
-        [Upos, RtRpos] = PeriodicBVP(mshPos, muPosTrans, @(x) VposTrans(x, specVar), F,...
-          BCpos, numCellsPos, struct('compute_RtR', true));
+        [Upos, RtRpos] = PeriodicBVP(mshPos, muPosTrans, @(x) VposTrans(x, specVar),...
+          [], 0, BCpos, numCellsPos, struct('compute_RtR', true));
 
         % Minus side
         BCneg.A = -RobinNeg;
-        [Uneg, RtRneg] = PeriodicBVP(mshNeg, muNegTrans, @(x) VnegTrans(x, specVar), F,...
-          BCneg, numCellsNeg, struct('compute_RtR', true));
+        [Uneg, RtRneg] = PeriodicBVP(mshNeg, muNegTrans, @(x) VnegTrans(x, specVar),...
+          [], 0, BCneg, numCellsNeg, struct('compute_RtR', true));
 
         % Compute solution on the overall domain
         defect.modeInt{idJ} = eigvecs(:, idE, d);
@@ -306,7 +304,6 @@ function EVPlocPert(pbInputs)
     figure(figCoeffs);
     subplot(4, 1, [3 4]);
     hold off;
-    % cst = max(abs(defect.modeInt{1}(:, 1)));
     
     for idI = 1:numCellsPos
       X = IDb(2) + mshPos.points + (idI - 1.0) * perPos;
