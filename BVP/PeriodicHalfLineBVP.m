@@ -1,5 +1,5 @@
-function [U, lambda, R, D, dU] = PeriodicBVP(msh, funP, funQ, F, ratioF, BC, numCells, opts)
-% function [U, lambda, dU] = PeriodicBVP(msh, funP, Q, F, ratioF, BC, numCells)
+function [U, lambda, R, D, dU] = PeriodicHalfLineBVP(msh, funP, funQ, F, ratioF, BC, numCells, opts)
+% function [U, lambda, dU] = PeriodicHalfLineBVP(msh, funP, Q, F, ratioF, BC, numCells)
 %
 % This function computes a Lagrange P1 Finite Elements approximation
 % of the solution of the regular Sturm Liouville equation

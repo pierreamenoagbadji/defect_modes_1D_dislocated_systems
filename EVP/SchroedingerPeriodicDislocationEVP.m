@@ -1,5 +1,5 @@
 % *************************************************** %
-% SCHROEDINGERPERDISLOC.m 
+% SchroedingerPeriodicDislocationEVP.m 
 % Computes defect modes for the Schroedinger operator
 %
 % -(μ(x)*u')'(x) + V(x) u(x) acting on L²(R),
@@ -190,13 +190,15 @@ function EVPlocPert(pbInputs)
       %                      - (u_±)' + r_± u_± = 1 at x = a_±
       % Plus side
       BCpos.A = -RobinPos;
-      [~, RtRpos] = PeriodicBVP(mshPos, muPosTrans, @(x) VposTrans(x, specVar),...
-        [], 0, BCpos, numCellsPos, struct('compute_RtR', true));
+      [~, RtRpos] = PeriodicHalfLineBVP(mshPos,...
+        muPosTrans, @(x) VposTrans(x, specVar), [], 0,...
+        BCpos, numCellsPos, struct('compute_RtR', true));
       
       % Minus side
       BCneg.A = -RobinNeg;
-      [~, RtRneg] = PeriodicBVP(mshNeg, muNegTrans, @(x) VnegTrans(x, specVar),...
-        [], 0, BCneg, numCellsNeg, struct('compute_RtR', true));
+      [~, RtRneg] = PeriodicHalfLineBVP(mshNeg,...
+        muNegTrans, @(x) VnegTrans(x, specVar), [], 0,...
+        BCneg, numCellsNeg, struct('compute_RtR', true));
 
       % Step 2
       % ****** %
@@ -280,13 +282,15 @@ function EVPlocPert(pbInputs)
         %                      - (u_±)' + r_± u_± = 1 at x = a_±
         % Plus side
         BCpos.A = -RobinPos;
-        [Upos, RtRpos] = PeriodicBVP(mshPos, muPosTrans, @(x) VposTrans(x, specVar),...
-          [], 0, BCpos, numCellsPos, struct('compute_RtR', true));
+        [Upos, RtRpos] = PeriodicHalfLineBVP(mshPos,...
+          muPosTrans, @(x) VposTrans(x, specVar), [], 0, ...
+          BCpos, numCellsPos, struct('compute_RtR', true));
 
         % Minus side
         BCneg.A = -RobinNeg;
-        [Uneg, RtRneg] = PeriodicBVP(mshNeg, muNegTrans, @(x) VnegTrans(x, specVar),...
-          [], 0, BCneg, numCellsNeg, struct('compute_RtR', true));
+        [Uneg, RtRneg] = PeriodicHalfLineBVP(mshNeg,...
+          muNegTrans, @(x) VnegTrans(x, specVar), [], 0,...
+          BCneg, numCellsNeg, struct('compute_RtR', true));
 
         % Compute solution on the overall domain
         defect.modeInt{idJ} = eigvecs(:, idE, d);
