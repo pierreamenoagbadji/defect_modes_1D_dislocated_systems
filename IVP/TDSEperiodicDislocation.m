@@ -68,7 +68,7 @@ sol0   = @(x) cutoff(x, -0.5, 0.5);
 %  ************************* %
 numNodes = 256;
 delta_t = 1e-2;
-final_t = 1e-1;
+final_t = 10;
 theta = 0.5;
 
 %  **** %
@@ -108,19 +108,19 @@ X = mshInt.points;
 xmin = IDb(1) + mshNeg.bounds(2) - (numCellsNeg - 1.0) * perNeg;
 xmax = IDb(2) + mshPos.bounds(2) + (numCellsPos - 1.0) * perPos;
 
-subplot(4, 1, 1); 
+subplot(3, 1, 1); 
 plot(X, muInt(X), 'r');
 title('$x \mapsto \mu (x)$');
 set(gca, 'FontSize', 16);
 xlim([xmin, xmax]);
 
-subplot(4, 1, 2); 
+subplot(3, 1, 2); 
 plot(X, Vint(X), 'b');
 title('$x \mapsto V (x)$');
 set(gca, 'FontSize', 16);
 xlim([xmin, xmax]);
 
-subplot(4, 1, 3); 
+subplot(3, 1, 3); 
 plot(X, rhsInt(X), 'Color', vert);
 title('$x \mapsto f (x)$');
 set(gca, 'FontSize', 16);
@@ -282,11 +282,11 @@ out.neg.DtN(1)  = out.neg.t10 * R + out.neg.t00;
 %  and complete reconstruction.      %
 %  ********************************* %
 [MM, KK] = FEmatrices(mshInt, Vint, muInt);
-MM0 = FEmatrices(mshInt);
-% *********************************************************** %
-out.int.AA =       theta  * (MM + KK) - (1i / delta_t) * MM0; %
-out.int.BB = (-1 + theta) * (MM + KK) - (1i / delta_t) * MM0; %
-% *********************************************************** %
+out.int.MM0 = FEmatrices(mshInt);
+% ******************************************************************* %
+out.int.AA =       theta  * (MM + KK) - (1i / delta_t) * out.int.MM0; %
+out.int.BB = (-1 + theta) * (MM + KK) - (1i / delta_t) * out.int.MM0; %
+% ******************************************************************* %
 
 % Compute boundary matrices
 out.int.S11 = sparse(Nint, Nint); 
@@ -296,7 +296,7 @@ out.int.S22(mshInt.boundsIds(2), mshInt.boundsIds(2)) = 1;
 
 AAint = out.neg.DtN(1) * out.int.S11 +...
         out.pos.DtN(1) * out.int.S22 + out.int.AA;
-LLint = out.int.BB * sol0(mshInt.points) - MM0 * rhsInt(mshInt.points);
+LLint = out.int.BB * sol0(mshInt.points) - out.int.MM0 * rhsInt(mshInt.points);
 
 % Interior solution % 
 % ***************** %
@@ -318,11 +318,15 @@ for idI = 1:numCellsNeg
 end
 
 plot(mshInt.points, real(out.int.sol(:, 1)), 'b');
+xmin = IDb(1) + mshNeg.bounds(2) - (numCellsNeg - 1.0) * perNeg;
+xmax = IDb(2) + mshPos.bounds(2) + (numCellsPos - 1.0) * perPos;
+title(['$t_1 = ', num2str(delta_t, '%0.5e'), '$'])
+axis([xmin, xmax, -1, 1.5]);
+pause;
 
 %  *************** %
 %% Next time steps %
 %  *************** %
-
 for idT = 2:numTsteps
 
   %  ********************************* %
@@ -334,12 +338,12 @@ for idT = 2:numTsteps
 
   eF  = out.pos.PP' * (AA0 \ LL0);
 
-  % source-to-Neumann coefficients
+  % Source-to-Neumann coefficients
   G0 = full(out.pos.e0' * out.pos.AA * eF);
   G1 = full(out.pos.e1' * out.pos.AA * eF);
 
   % Compute the current propagation coefficient
-  out.pos.prop(idT) = (G1 + out.pos.prop(1) * G0 +...
+  out.pos.prop(idT) = -(G1 + out.pos.prop(1) * G0 +...
     out.pos.prop(idT-1:-1:2).' * out.pos.DtN(2:idT-1)) /...
    (out.pos.t11 + out.pos.t10  * out.pos.prop(1) + out.pos.DtN(1));
 
@@ -368,7 +372,7 @@ for idT = 2:numTsteps
   G1 = -full(out.neg.e1' * out.neg.AA * eF);
 
   % Compute the current propagation coefficient
-  out.neg.prop(idT) = (G1 + out.neg.prop(1) * G0 + ...
+  out.neg.prop(idT) = -(G1 + out.neg.prop(1) * G0 + ...
     out.neg.prop(idT-1:-1:2).' * out.neg.DtN(2:idT-1)) /...
    (out.neg.t11 + out.neg.t10  * out.neg.prop(1) + out.neg.DtN(1));
 
@@ -388,13 +392,13 @@ for idT = 2:numTsteps
   AAint = out.neg.DtN(1) * out.int.S11 +...
           out.pos.DtN(1) * out.int.S22 + out.int.AA;
   
-  LLint = out.int.BB * sol0(mshInt.points) - MM0 * rhsInt(mshInt.points)...
-        + out.int.sol(mshInt.boundsIds(1), idT-1:-1:1) * out.neg.DtN(2:idT);
+  LLint = out.int.BB * out.int.sol(:, idT-1) - out.int.MM0 * rhsInt(mshInt.points);
 
   % Surface contributions
-  LLint(mshInt.boundsIds(1)) = LLint(mshInt.boundsIds(1)) +...
-    out.int.sol(mshInt.boundsIds(1), idT-1:-1:1) * out.pos.DtN(2:idT);
-  LLint(mshInt.boundsIds(1)) = LLint(mshInt.boundsIds(1)) +...
+  LLint(mshInt.boundsIds(1)) = LLint(mshInt.boundsIds(1)) -...
+    out.int.sol(mshInt.boundsIds(1), idT-1:-1:1) * out.neg.DtN(2:idT);
+  
+  LLint(mshInt.boundsIds(2)) = LLint(mshInt.boundsIds(2)) -...
     out.int.sol(mshInt.boundsIds(2), idT-1:-1:1) * out.pos.DtN(2:idT);
 
   % Interior solution
@@ -426,6 +430,9 @@ for idT = 2:numTsteps
   end
 
   plot(mshInt.points, real(out.int.sol(:, idT)), 'b');
-  pause;
+  
+  axis([xmin, xmax, -1, 1.5]);
+  title(['$t_{', int2str(idT), '} = ', num2str(idT*delta_t, '%0.5e'), '$']);
+  pause(0.05);
 
 end
