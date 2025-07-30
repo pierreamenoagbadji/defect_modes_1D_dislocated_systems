@@ -29,8 +29,8 @@ vert = [035, 120, 057] / 255;
 %% Parameters %
 %  ********** %
 IDb = [-1.0 1.0]; % Bounds of the interior domain
-numCellsPos = 4; % Number of cells on which to compute solution on Ω_+ 
-numCellsNeg = 4; % Number of cells on which to compute solution on Ω_-
+numCellsPos = 3; % Number of cells on which to compute solution on Ω_+ 
+numCellsNeg = 3; % Number of cells on which to compute solution on Ω_-
 
 % Coefficients outside the interior domain
 % The coefficients are periodic outside the
@@ -56,19 +56,20 @@ end
 
 % Coefficients inside the interior domain
 muInt = @(x) ones(size(x, 1), 1);
-Vint  = @(x) zeros(size(x, 1), 1); % Veven(x) + kappa(x) .* Vodd(x);
+Vint  = @(x) zeros(size(x, 1), 1); % cos(2*pi*x); % Veven(x) + kappa(x) .* Vodd(x);
 
 % Source term and initial data
 % are compactly supported in interior domain
-rhsInt = @(x) zeros(size(x, 1), 1);
-sol0   = @(x) cutoff(x, -0.5, 0.5);
+rhsInt = @(x, t) zeros(size(x, 1), 1);
+asol0 = 30;
+sol0   = @(x) exp(-asol0 * x.^2);% cutoff(x, -0.5, 0.5);
 
 %  ************************* %
 %% Discretization parameters %
 %  ************************* %
 numNodes = 256;
-delta_t = 1e-2;
-final_t = 10;
+delta_t = 1e-3;
+final_t = 1;
 theta = 0.5;
 
 %  **** %
@@ -94,14 +95,14 @@ figCoeffs = figure;
 
 for idI = 1:numCellsPos
   X = IDb(2) + mshPos.points + (idI - 1.0) * perPos;
-  subplot(4, 1, 1); plot(X, muPos(X), 'r'); hold on;
-  subplot(4, 1, 2); plot(X,  Vpos(X), 'b'); hold on;
+  subplot(3, 1, 1); plot(X, muPos(X), 'r'); hold on;
+  subplot(3, 1, 2); plot(X,  Vpos(X), 'b'); hold on;
 end
 
 for idI = 1:numCellsNeg
   X = IDb(1) + mshNeg.points - (idI - 1.0) * perNeg;
-  subplot(4, 1, 1); plot(X, muNeg(X), 'r');
-  subplot(4, 1, 2); plot(X,  Vneg(X), 'b');
+  subplot(3, 1, 1); plot(X, muNeg(X), 'r');
+  subplot(3, 1, 2); plot(X,  Vneg(X), 'b');
 end
 
 X = mshInt.points;
@@ -121,7 +122,7 @@ set(gca, 'FontSize', 16);
 xlim([xmin, xmax]);
 
 subplot(3, 1, 3); 
-plot(X, rhsInt(X), 'Color', vert);
+plot(X, rhsInt(X, 0), 'Color', vert);
 title('$x \mapsto f (x)$');
 set(gca, 'FontSize', 16);
 xlim([xmin, xmax]);
@@ -151,19 +152,19 @@ VposTrans  = @(x)  Vpos(x + IDb(2));
 % Local cell solutions %
 % ******************** %
 % FE matrices
-[MM, KK] = FEmatrices(mshPos, Vpos, muPos);
+[MM, KK] = FEmatrices(mshPos, VposTrans, muPosTrans);
 MM0 = FEmatrices(mshPos);
 out.pos.PP = sparse((1:Npos-2)', (2:Npos-1)', ones(Npos-2, 1), Npos-2, Npos);
-% *********************************************************** %
-out.pos.AA =       theta *  (MM + KK) - (1i / delta_t) * MM0; %
-out.pos.BB = (-1 + theta) * (MM + KK) - (1i / delta_t) * MM0; %
-% *********************************************************** %
+% ********************************************************* %
+out.pos.AA =       theta  * delta_t * (MM + KK) - 1i * MM0; %
+out.pos.BB = (-1 + theta) * delta_t * (MM + KK) - 1i * MM0; %
+% ********************************************************* %
 AA0 = out.pos.PP * out.pos.AA * out.pos.PP';
 
 % Right-hand side
 Ub = sparse(Npos, 2);
 Ub(mshPos.boundsIds, :) = eye(2);
-LL = - out.pos.AA * Ub;
+LL = -out.pos.AA * Ub;
 LL0 = out.pos.PP * LL;
 
 % Solve the linear system and deduce the solution
@@ -208,25 +209,25 @@ out.pos.DtN(1)  = out.pos.t10 * R + out.pos.t00;
 %  ****************************** %
 %% First time step: negative side %
 %  ****************************** %
-muNegTrans = @(x) muNeg(x + IDb(2));
-VnegTrans  = @(x)  Vneg(x + IDb(2));
+muNegTrans = @(x) muNeg(x + IDb(1));
+VnegTrans  = @(x)  Vneg(x + IDb(1));
 
 % Local cell solutions %
 % ******************** %
 % FE matrices
-[MM, KK] = FEmatrices(mshNeg, Vpos, muNeg);
+[MM, KK] = FEmatrices(mshNeg, VnegTrans, muNegTrans);
 MM0 = FEmatrices(mshNeg);
 out.neg.PP = sparse((1:Nneg-2)', (2:Nneg-1)', ones(Nneg-2, 1), Nneg-2, Nneg);
-% *********************************************************** %
-out.neg.AA =       theta  * (MM + KK) - (1i / delta_t) * MM0; %
-out.neg.BB = (-1 + theta) * (MM + KK) - (1i / delta_t) * MM0; %
-% *********************************************************** %
+% ********************************************************* %
+out.neg.AA =       theta  * delta_t * (MM + KK) - 1i * MM0; %
+out.neg.BB = (-1 + theta) * delta_t * (MM + KK) - 1i * MM0; %
+% ********************************************************* %
 AA0 = out.neg.PP * out.neg.AA * out.neg.PP';
 
 % Right-hand side
 Ub = sparse(Nneg, 2);
 Ub(mshNeg.boundsIds, :) = eye(2);
-LL = - out.neg.AA * Ub;
+LL = -out.neg.AA * Ub;
 LL0 = out.neg.PP * LL;
 
 % Solve the linear system and deduce the solution
@@ -265,7 +266,7 @@ end
 
 % Compute auxiliary solution at first time step %
 % ********************************************* %
-auxSolNeg(:, :, 1) = (out.pos.e0 + out.pos.e1 * R) * R.^(0:numCellsNeg-1);
+auxSolNeg(:, :, 1) = (out.neg.e0 + out.neg.e1 * R) * R.^(0:numCellsNeg-1);
 
 % Update solution %
 % *************** %
@@ -283,30 +284,34 @@ out.neg.DtN(1)  = out.neg.t10 * R + out.neg.t00;
 %  ********************************* %
 [MM, KK] = FEmatrices(mshInt, Vint, muInt);
 out.int.MM0 = FEmatrices(mshInt);
-% ******************************************************************* %
-out.int.AA =       theta  * (MM + KK) - (1i / delta_t) * out.int.MM0; %
-out.int.BB = (-1 + theta) * (MM + KK) - (1i / delta_t) * out.int.MM0; %
-% ******************************************************************* %
+% ***************************************************************** %
+out.int.AA =       theta  * delta_t * (MM + KK) - 1i * out.int.MM0; %
+out.int.BB = (-1 + theta) * delta_t * (MM + KK) - 1i * out.int.MM0; %
+% ***************************************************************** %
 
-% Compute boundary matrices
-out.int.S11 = sparse(Nint, Nint); 
-out.int.S22 = sparse(Nint, Nint); 
-out.int.S11(mshInt.boundsIds(1), mshInt.boundsIds(1)) = 1;
-out.int.S22(mshInt.boundsIds(2), mshInt.boundsIds(2)) = 1;
+% Surface contributions
+S11 = sparse(Nint, Nint); 
+S22 = sparse(Nint, Nint); 
+S11(mshInt.boundsIds(1), mshInt.boundsIds(1)) = 1;
+S22(mshInt.boundsIds(2), mshInt.boundsIds(2)) = 1;
 
-AAint = out.neg.DtN(1) * out.int.S11 +...
-        out.pos.DtN(1) * out.int.S22 + out.int.AA;
-LLint = out.int.BB * sol0(mshInt.points) - out.int.MM0 * rhsInt(mshInt.points);
+out.int.AA = out.int.AA + out.neg.DtN(1) * S11 + out.pos.DtN(1) * S22;
+
+% Right-hand side
+rhsTheta = @(idT)       theta  * rhsInt(mshInt.points, (idT  ) * delta_t) +...
+                  (-1 + theta) * rhsInt(mshInt.points, (idT-1) * delta_t);
+LLint = out.int.BB * sol0(mshInt.points) - out.int.MM0 * rhsTheta(1);
 
 % Interior solution % 
 % ***************** %
-out.int.sol(:, 1) = AAint \ LLint;
+out.int.sol(:, 1) = out.int.AA \ LLint;
 
 % Construct entire solution
 out.pos.sol(:, :, 1) = out.int.sol(mshInt.boundsIds(2), 1) * auxSolPos(:, :, 1);
 out.neg.sol(:, :, 1) = out.int.sol(mshInt.boundsIds(1), 1) * auxSolNeg(:, :, 1);
 
 figSol = figure;
+
 for idI = 1:numCellsPos
   X = IDb(2) + mshPos.points + (idI - 1.0) * perPos;
   plot(X, real(out.pos.sol(:, idI, 1)), 'b'); hold on;
@@ -321,7 +326,15 @@ plot(mshInt.points, real(out.int.sol(:, 1)), 'b');
 xmin = IDb(1) + mshNeg.bounds(2) - (numCellsNeg - 1.0) * perNeg;
 xmax = IDb(2) + mshPos.bounds(2) + (numCellsPos - 1.0) * perPos;
 title(['$t_1 = ', num2str(delta_t, '%0.5e'), '$'])
-axis([xmin, xmax, -1, 1.5]);
+axis([xmin, xmax, -0.5, 1.0]);
+
+% Reference solution
+% if initial data is a gaussian
+Uref = @(x, t) (1 / sqrt(1 + 4i * asol0*t)) * exp(-asol0 * x.^2 / (1 + 4i * asol0*t));
+
+x = linspace(xmin, xmax, 2^10);
+plot(x, real(Uref(x, delta_t)), 'r*', 'MarkerSize', 1);
+% error;
 pause;
 
 %  *************** %
@@ -334,21 +347,22 @@ for idT = 2:numTsteps
   %  ********************************* %
   % Local cell solution with right-hand side
   AA0 = out.pos.PP * out.pos.AA * out.pos.PP';
-  LL0 = out.pos.PP * out.pos.BB * auxSolPos(:, 1, idT-1);
+  LL  = out.pos.BB * auxSolPos(:, 1, idT-1);
+  LL0 = out.pos.PP * LL;
 
   eF  = out.pos.PP' * (AA0 \ LL0);
 
   % Source-to-Neumann coefficients
-  G0 = full(out.pos.e0' * out.pos.AA * eF);
-  G1 = full(out.pos.e1' * out.pos.AA * eF);
+  G0pos = full(out.pos.e0' * (out.pos.AA * eF - LL));
+  G1pos = full(out.pos.e1' * (out.pos.AA * eF - LL));
 
   % Compute the current propagation coefficient
-  out.pos.prop(idT) = -(G1 + out.pos.prop(1) * G0 +...
+  out.pos.prop(idT) = -(G1pos + out.pos.prop(1) * G0pos +...
     out.pos.prop(idT-1:-1:2).' * out.pos.DtN(2:idT-1)) /...
-   (out.pos.t11 + out.pos.t10  * out.pos.prop(1) + out.pos.DtN(1));
+    (out.pos.t11 + out.pos.t10 * out.pos.prop(1) + out.pos.DtN(1));
 
   % Deduce DtN coefficient
-  out.pos.DtN(idT) = G0 + out.pos.t10 * out.pos.prop(idT);
+  out.pos.DtN(idT) = G0pos + out.pos.t10 * out.pos.prop(idT);
 
   % Compute auxiliary solution cell by cell
   auxSolPos(:, 1, idT) = eF + out.pos.prop(idT) * out.pos.e1;
@@ -362,22 +376,23 @@ for idT = 2:numTsteps
   %  ********************************* %
   % Local cell solution with right-hand side
   AA0 = out.neg.PP * out.neg.AA * out.neg.PP';
-  LL0 = out.neg.PP * out.neg.BB * auxSolNeg(:, 1, idT-1);
+  LL  = out.neg.BB * auxSolNeg(:, 1, idT-1);
+  LL0 = out.neg.PP * LL;
 
   eF  = out.neg.PP' * (AA0 \ LL0);
 
   % source-to-Neumann coefficients
   % Again, the '-' sign is important.
-  G0 = -full(out.neg.e0' * out.neg.AA * eF);
-  G1 = -full(out.neg.e1' * out.neg.AA * eF);
+  G0neg = -full(out.neg.e0' * (out.neg.AA * eF - LL));
+  G1neg = -full(out.neg.e1' * (out.neg.AA * eF - LL));
 
   % Compute the current propagation coefficient
-  out.neg.prop(idT) = -(G1 + out.neg.prop(1) * G0 + ...
+  out.neg.prop(idT) = -(G1neg + out.neg.prop(1) * G0neg + ...
     out.neg.prop(idT-1:-1:2).' * out.neg.DtN(2:idT-1)) /...
-   (out.neg.t11 + out.neg.t10  * out.neg.prop(1) + out.neg.DtN(1));
+    (out.neg.t11 + out.neg.t10 * out.neg.prop(1) + out.neg.DtN(1));
 
   % Deduce DtN coefficient
-  out.neg.DtN(idT) = G0 + out.neg.t10 * out.neg.prop(idT);
+  out.neg.DtN(idT) = G0neg + out.neg.t10 * out.neg.prop(idT);
 
   % Compute auxiliary solution cell by cell
   auxSolNeg(:, 1, idT) = eF + out.neg.prop(idT) * out.neg.e1;
@@ -389,10 +404,7 @@ for idT = 2:numTsteps
   %  **************** %
   %% Interior problem %
   %  **************** %
-  AAint = out.neg.DtN(1) * out.int.S11 +...
-          out.pos.DtN(1) * out.int.S22 + out.int.AA;
-  
-  LLint = out.int.BB * out.int.sol(:, idT-1) - out.int.MM0 * rhsInt(mshInt.points);
+  LLint = out.int.BB * out.int.sol(:, idT-1) - out.int.MM0 * rhsTheta(idT);
 
   % Surface contributions
   LLint(mshInt.boundsIds(1)) = LLint(mshInt.boundsIds(1)) -...
@@ -402,7 +414,7 @@ for idT = 2:numTsteps
     out.int.sol(mshInt.boundsIds(2), idT-1:-1:1) * out.pos.DtN(2:idT);
 
   % Interior solution
-  out.int.sol(:, idT) = AAint \ LLint;
+  out.int.sol(:, idT) = out.int.AA \ LLint;
 
   %  ************************* %
   %% Construct entire solution %
@@ -419,6 +431,7 @@ for idT = 2:numTsteps
 
   figure(figSol);
   hold off;
+
   for idI = 1:numCellsPos
     X = IDb(2) + mshPos.points + (idI - 1.0) * perPos;
     plot(X, real(out.pos.sol(:, idI, idT)), 'b'); hold on;
@@ -430,8 +443,11 @@ for idT = 2:numTsteps
   end
 
   plot(mshInt.points, real(out.int.sol(:, idT)), 'b');
+
+  % Reference solution
+  plot(x, real(Uref(x, idT * delta_t)), 'r*', 'MarkerSize', 1);
   
-  axis([xmin, xmax, -1, 1.5]);
+  axis([xmin, xmax, -0.5, 1.0]);
   title(['$t_{', int2str(idT), '} = ', num2str(idT*delta_t, '%0.5e'), '$']);
   pause(0.05);
 
